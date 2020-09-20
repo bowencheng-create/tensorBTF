@@ -9,3 +9,9 @@ Results: The BTF-subtyping analysis identified 17 optimized latent components, w
 Conclusion: Our preliminary data showed that the proposed approach is a promising strategy to efficiently use publicly available multiomics data to identify breast and other cancer subtypes. Since BTF is relatively time-consuming, future work is to implement efficient BTF related algorithms to speed up the factorization for integration of larger multiomics data sets.
 
 Keywords: Breast cancer subtyping, Bayesian tensor factorization, consensus clustering, survival analysis, multiomics data
+
+
+Bowen Cheng 
+Dalla Lana School of Public Health, University of Toronto
+
+Supervisor: Dr. Pingzhao Hu
