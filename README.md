@@ -12,6 +12,7 @@ Keywords: Breast cancer subtyping, Bayesian tensor factorization, consensus clus
 
 
 Bowen Cheng 
+
 Dalla Lana School of Public Health, University of Toronto
 
 Supervisor: Dr. Pingzhao Hu
