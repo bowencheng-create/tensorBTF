@@ -1,0 +1,551 @@
+# complete source codes :
+setwd("~/Desktop/practicum")
+
+# data import
+# data1 : copy number variation data
+data1 <- read.csv('breast cancer/FinalCopyNumberVariationData.csv', header= TRUE,stringsAsFactors = FALSE) 
+rownames(data1)<-data1$X
+data1$X<-NULL
+# tranpose
+data1_t <- as.data.frame(t(as.matrix(data1)))
+#data2 FinalGeneExpressionData
+data2<- read.csv('breast cancer/FinalGeneExpressionData.csv',header= TRUE,stringsAsFactors = FALSE)
+rownames(data2)<-data2$X
+data2$X<-NULL
+# tranpose
+data2_t <- as.data.frame(t(as.matrix(data2)))
+#lapply(data2_t, as.numeric)
+#data3 FinalMethylationData
+data3<- read.csv('breast cancer/FinalMethylationData.csv',header= TRUE,stringsAsFactors = FALSE) 
+rownames(data3)<-data3$X
+data3$X<-NULL
+# tranpose
+data3_t <- as.data.frame(t(as.matrix(data3)))
+#sort by row names (patient id)
+data1_t<- data1_t[ order(row.names(data1_t)), ]
+data2_t<- data2_t[ order(row.names(data2_t)), ]
+data3_t<- data3_t[ order(row.names(data3_t)), ] 
+#any(is.na(data1_t))
+#any(is.na(data2_t))
+#any(is.na(data3_t)) # no missing values
+#unique(data1_t)
+#unique(data2_t)
+#unique(data3_t) # nothing removed
+#sort by row names (patient id)
+data1<- data1[ order(row.names(data1)), ]
+data2<- data2[ order(row.names(data2)), ]
+data3<- data3[ order(row.names(data3)), ]
+#aggressive filtering
+# the following codes are to find the patients where all the values of # gene variables= 0 or
+# genes where all the patients obtain value 0 in terms of them
+# since this issue will make the factorization process problematic 
+
+index = apply(data1== 0, MARGIN = 1, all)
+table(index)
+index = apply(data1_t == 0, MARGIN = 1, all)
+table(index) #looks good
+index = apply(data3== 0, MARGIN = 1, all)
+table(index)
+index = apply(data3_t == 0, MARGIN = 1, all)
+table(index) #looks good
+index = apply(data2== 0, MARGIN = 1, all)
+table(index) #does not look good
+index = apply(data2_t == 0, MARGIN = 1, all)
+table(index) #looks good
+#remove the genes where all the patients obtain value 0 
+data2_new<- subset(data2,(!apply(data2== 0, MARGIN = 1, all))) 
+data3_new<- subset(data3,(!apply(data2== 0, MARGIN = 1, all))) 
+data1_new<- subset(data1,(!apply(data2== 0, MARGIN = 1, all))) 
+a<-rnorm(17737)
+a<- subset(a,(apply(data2== 0, MARGIN = 1, all)))
+#transpose
+data2_t_new <- as.data.frame(t(as.matrix(data2_new))) 
+data1_t_new <- as.data.frame(t(as.matrix(data1_new))) 
+data3_t_new <- as.data.frame(t(as.matrix(data3_new)))
+#sort by row names (patient id)
+data1_t_new<- data1_t_new[ order(row.names(data1_t_new)), ]
+
+data2_t_new<- data2_t_new[ order(row.names(data2_t_new)), ] 
+data3_t_new<- data3_t_new[ order(row.names(data3_t_new)), ] 
+#any(is.na(data1_t_new))
+#any(is.na(data2_t_new))
+#any(is.na(data3_t_new)) # no missing values
+#unique(data1_t_new)
+#unique(data2_t_new)
+#unique(data3_t_new) # nothing removed 
+patients <- rownames(data3_t)
+data11<- as.matrix(data1_t_new)
+data22<-as.matrix(data2_t_new)
+data33<-as.matrix(data3_t_new)
+# since the dataset of dimension (771 * 17627 * 3) is too big for factorization,
+# which takes a long time. I will rank the genes based on Coefficient of variation 
+# and select top 10% genes out of 17627 genes
+# this is called "unsupervised feature selection "
+# select the top 10% genes with larger CV from each data set 
+# then take the union of the gene sets from the three data sets.
+library(Rfast) 
+cv1<-sqrt(colVars(data11))/abs(colMeans(data11))
+#17627*0.1 #1763
+cv1sort <- sort(cv1, decreasing = TRUE)
+cv1sortm<- matrix(data=cv1sort, nrow = 1, ncol=17627)
+
+colnames(cv1sortm)<- names(cv1sort)
+cv1select<- cv1sortm[1,1:1763] 
+name1<-matrix(colnames(cv1sortm), nrow = 1, ncol=17627)
+name1select <-name1[1,1:1763] 
+cv2<-sqrt(colVars(data22))/abs(colMeans(data22)) 
+#17627*0.1 #1763
+cv2sort <- sort(cv2, decreasing = TRUE)
+cv2sortm<- matrix(data=cv2sort, nrow = 1, ncol=17627) 
+colnames(cv2sortm)<- names(cv2sort)
+cv2select<- cv2sortm[1,1:1763] 
+name2<-matrix(colnames(cv2sortm), nrow = 1, ncol=17627) 
+name2select <-name2[1,1:1763] 
+cv3<-sqrt(colVars(data33))/abs(colMeans(data33)) 
+#17627*0.1 #1763
+cv3sort <- sort(cv3, decreasing = TRUE)
+cv3sortm<- matrix(data=cv3sort, nrow = 1, ncol=17627)
+colnames(cv3sortm)<- names(cv3sort)
+cv3select<- cv3sortm[1,1:1763] 
+name3<-matrix(colnames(cv3sortm), nrow = 1, ncol=17627) 
+name3select <-name3[1,1:1763]
+union<- union(union(name3select, name2select),name1select) 
+#test<-unique( union)
+unionsort <- sort(union)
+
+str(unionsort) # chr [1:4520]
+# remove the genes with invalid names including:
+# "03-Mar" "04-Mar" "07-Mar" "11-Mar" "11-Sep"
+unionsort2<-unionsort[6:4520]
+str(unionsort2) # chr [1:4515]
+data11select<- data11[, select = c(unionsort2)]
+data22select<- data22[, select = c(unionsort2)]
+data33select<- data33[, select = c(unionsort2)]
+dim(data11select) #771, 4515
+# import clinical table
+data4<- read.csv("breast cancer/FinalClinicalTable.csv")
+dim(data4) # 1085 23
+#bcr_patient_barcode
+table(data4$type) # BRCA: 1085
+table(data4$gender) #FEMALE: 1085
+#since our focus is female patient with breast cancer,
+#I will remove male patients if they are samples.
+#since all patients are female in the data, I do not need to remove any patients at this moment
+rownames(data4) = data4$bcr_patient_barcode
+table(data4$OS) #0: 935; 1 :150 # 1 is death, 0 is censored
+table(data4$DSS) # #N/A: 19 0:984 1:82
+table(data4$OS.time) # N/A : 1
+table(data4$DSS.time) # #N/A : 1
+
+table(data4$age_at_initial_pathologic_diagnosis) # #N/A: 1 
+table(data4$ajcc_pathologic_tumor_stage)
+#[Discrepancy] [Not Available], I, IA, IB,II,IIA,IIB,III,IIIA,IIIB,IIIC,
+#IV, X
+table(data4$er_status_by_ihc)
+
+table(data4$pr_status)
+
+table(data4$her2_status_by_ihc)
+
+table(data4$subtype)
+#Her2 LumA LumB TN
+# 37 417 121 111
+data4$tumor_stage= data4$ajcc_pathologic_tumor_stage
+data4$age= data4$age_at_initial_pathologic_diagnosis
+data4_ss<-data4
+# indicate missing values by NA
+#data4_ss$DSS = ifelse (data4_ss$DSS == "#N/A", NA, data4_ss$DSS )
+
+
+data4_ss$DSS = ifelse (data4_ss$DSS == "#N/A", 0, data4_ss$DSS ) 
+data4_ss$OS.time = ifelse (data4_ss$OS.time == "#N/A", NA, data4_ss$OS.time )
+data4_ss$DSS.time = ifelse (data4_ss$DSS.time == "#N/A", NA, data4_ss$DSS.time ) 
+data4_ss$age = ifelse (data4_ss$age == "#N/A", NA, data4_ss$age ) 
+data4_ss$tumor_stage = ifelse ((data4_ss$tumor_stage == "[Discrepancy]"|
+
+data4_ss$tumor_stage == "[Not Available]"), NA, data4_ss$tumor_stage )
+
+data4_ss$er_status_by_ihc= ifelse ((data4_ss$er_status_by_ihc =="[Not Evaluated]"| 
+data4_ss$er_status_by_ihc == "Indeterminate"),NA, data4_ss$er_status_by_ihc ) 
+data4_ss$pr_status= ifelse ((data4_ss$pr_status == "[Not Evaluated]"|
+data4_ss$pr_status == "Indeterminate"),NA, data4_ss$pr_status ) 
+data4_ss$her2_status_by_ihc=
+ifelse ((data4_ss$her2_status_by_ihc == "[Not Evaluated]"| data4_ss$her2_status_by_ihc == "Indeterminate"|
+data4_ss$her2_status_by_ihc == "[Not Available]" ),NA, data4_ss$her2_status_by_ihc )
+table(data4_ss$OS.time)
+table(data4_ss$DSS.time) 
+table(data4_ss$tumor_stage)
+# I, IA, IB,II,IIA,IIB,III,IIIA,IIIB,IIIC, IV, X 
+data4_ss$age<-as.numeric(data4_ss$age) 
+data4_ss$OS.time<- as.numeric(data4_ss$OS.time)
+
+data4_ss$DSS.time<-as.numeric(data4_ss$DSS.time)
+data4_ss$OS<- as.numeric(data4_ss$OS) 
+data4_ss$DSS<-as.numeric(data4_ss$DSS)
+# combine tumor stage I, IA , IB into stage I
+# combine tumor stage II, IIA , IIB into stage II
+# combine tumor stage III, IIIA , IIIB, IIIC into stage III # IV, X into stage IV or X
+data4_ss$ts<- data4_ss$tumor_stage 
+data4_ss$tumor_stage=ifelse(
+(data4_ss$ts=="IA"|data4_ss$ts=="IB"), "I",ifelse((
+data4_ss$ts=="IIA"| data4_ss$ts=="IIB"), "II", ifelse((
+data4_ss$ts=="IIIA"|data4_ss$ts=="IIIB"| data4_ss$ts=="IIIC"),
+"III",ifelse(( data4_ss$ts=="X"|data4_ss$ts=="IV"), "X or IV",data4_ss$ts))))
+library(dplyr)
+data4_s<-data4_ss
+data4_s$age =as.numeric(data4_s$age_at_initial_pathologic_diagnosis) 
+summary(data4_s$age) # min 26 max 90
+str(data4_s$OS.time)
+
+str(data4_s$DSS.time)
+data4_s$OS.time<- as.numeric(data4_s$OS.time) 
+data4_s$DSS.time<-as.numeric(data4_s$DSS.time)
+for (i in 1: dim(data4_s)[1]){ substr(rownames(data4_s)[i], 5,5)="."} 
+for (i in 1: dim(data4_s)[1]){ substr(rownames(data4_s)[i], 8,8)="."} 
+data4_s$bcr_patient_barcode = rownames(data4_s)
+#take subsets of data11select,data22select and data33select where
+# patients IDs are the same as data4_s 
+data11select<-data11select[which(rownames(data11select)%in%
+data4_s$bcr_patient_barcode),]
+data22select<-data22select[which(rownames(data22select)%in%
+data4_s$bcr_patient_barcode),]
+data33select<-data33select[which(rownames(data33select)%in%
+data4_s$bcr_patient_barcode),] 
+# dim(data11select) # 762 * 4515
+data11select_s = data11select 
+data22select_s = data22select 
+data33select_s = data33select
+z_s <- array(NA, dim = c(762 , 4515 , 3 ),
+dimnames = list(rownames(data11select_s), colnames(data11select_s),
+c("CopyNumberVariation","GeneExpression", "Methylation")))
+
+for(i in 1:762) { for(j in 1:4515) {
+
+z_s[i,j ,1 ] = data11select_s [i,j] 
+z_s[i,j ,2 ]= data22select_s [i,j]
+ z_s[i,j ,3 ]= data33select_s [i,j]
+} }
+library(tensorBF)
+# change opts
+opts<- getDefaultOpts()
+opts$prior.betaW1=0.1 # value changed
+opts$prior.betaW2=1000
+opts$init.tau=2
+# implement tensor BTF
+BFselect9_ori<- tensorBF(z_s,K=100, fiberCentering = 3, slabScaling =3,
+noiseProp =c(0.5,0.5),opts=opts ) 
+# change K = 100 to 5,10,75,150 ; re-run
+BF5<- tensorBF(z_s,K=5, fiberCentering = 3, slabScaling =3,noiseProp =c(0.5,0.5),opts=opts ) 
+BF10<- tensorBF(z_s,K=10, fiberCentering = 3, slabScaling =3,noiseProp =c(0.5,0.5),opts=opts ) 
+BF50<- tensorBF(z_s,K=50, fiberCentering = 3, slabScaling =3,noiseProp =c(0.5,0.5),opts=opts ) 
+BF75<- tensorBF(z_s,K=75, fiberCentering = 3, slabScaling =3,noiseProp =c(0.5,0.5),opts=opts )
+BF150<- tensorBF(z_s,K=150, fiberCentering = 3, slabScaling =3,noiseProp =c(0.5,0.5),opts=opts )
+
+#BTF selected 5 as the optimized rank out of 5 as the initial rank,
+#10 out of the initial 10, 17 out of the initial 50,
+#17 out of the initial 75, 17 out of the initial 100,
+#16 out of the initial 150
+#finally, we select 100 as the inital given rank, which leads to 17 as the optimized rank 
+plot(c(5,10,50,75,100,150),c(5,10,17,17,17,16),xlab = "No. of initial rank",
+ylab = "No. of Optimized Rank", type = "b",col="blue")
+BFselect10new<- BFselect9_ori
+dim(BFselect10new$U) # 3 * 17
+#rownames(BFselect10new$U)<-c("CopyNumberVariation","GeneExpression", # "Methylation" )
+dim(BFselect10new$X) # 762 * 17
+#rownames(BFselect10new$X)<- rownames(data11select) 
+dim(BFselect10new$W) # 4515 * 17
+# for some reason, the matrix W has no rownames 
+rownames(BFselect10new$W)<- colnames(data11select)
+# we will implement analysis based on matrix X
+# find outliers per column of matrix X and replace it with mean 
+lookforoutliers <- function(dat) {
+q25 = quantile(dat)[2] # 25%quantile 
+q75 = quantile(dat)[4] # 75% quantile 
+upper = 3*( q75 - q25 ) + q75
+lower = q25 - 3*( q75 - q25 )
+
+result <- which(dat > upper | dat < lower)
+result 
+}
+outliers<-apply(BFselect10new$X, 2, lookforoutliers)
+# when calculate column means of BFselect$X, we exclude outliers
+# for convenience, we signal outliers by NA (later they will be replaced)
+Xcolmean<-as.matrix(BFselect10new$X)
+for (j in 1:17){ # needs to be changed when ranks change
+if(length( outliers[[j]])>0){
+for (k in 1: length( outliers[[j]]))
+{
+Xcolmean[outliers[[j]][k],j ] = NA 
+}}}
+XcolMean<-colMeans(Xcolmean, na.rm=TRUE)
+# replace the outliers by column means
+X_new <- Xcolmean
+for (j in 1:17){ # needs to be changed when ranks change
+for( i in 1:762){ #771 needs to be changed 
+if (is.na(X_new[i,j])){
+X_new[i,j] = XcolMean[j] 
+}}}
+t<-X_new
+ttranspose<-t(t)
+
+tt=ttranspose
+# identify the number of components (optimized rank) 
+library(ConsensusClusterPlus)
+library(CancerSubtypes)
+d = data11select # copy number variation
+d2 = data22select # gene expression
+d3 = data33select # methylation
+#identify the number of components for the factorized matrix X 
+png("resultsCDF.png")
+resultsCDF = ConsensusClusterPlus(tt,maxK=10,reps=50,clusterAlg = "km",
+distance="euclidean",seed=700)
+dev.off()
+#identify the number of components for Copy number variation 
+png("resultsCDF2.png")
+resultsCDF2 = ConsensusClusterPlus(t(d),maxK=10,reps=50,clusterAlg = "km",
+distance="euclidean",seed=700)
+dev.off()
+#identify the number of components for gene expression
+png("resultsCDF3.png")
+resultsCDF3 = ConsensusClusterPlus(t(d2),maxK=10,reps=50,clusterAlg = "km",
+distance="euclidean",seed=700)
+dev.off()
+#identify the number of components for methylation
+
+png("resultsCDF4.png")
+resultsCDF4 = ConsensusClusterPlus(t(d3),maxK=10,reps=50,clusterAlg = "km",
+distance="euclidean",seed=700)
+dev.off()
+# identify the 6 cancer subtypes based on the factorized matrix X 
+set.seed(700)
+result2.test=ExecuteCNMF(tt,clusterNum=6, nrun = 50) 
+table(result2.test$group) 
+##################################################
+# regarding the clinical table, data4=data4_s=data4_ss
+for (i in 1: dim(data4_s)[1]){ substr(rownames(data4_s)[i], 5,5)="."} 
+for (i in 1: dim(data4_s)[1]){ substr(rownames(data4_s)[i], 8,8)="."} 
+data4_s$bcr_patient_barcode = rownames(data4_s) 
+data4_complete<- data4_s
+data4_complete$cluster =0
+table(data4_complete$cluster)
+for (i in 1:6){
+data4_complete$cluster =ifelse(
+data4_complete$bcr_patient_barcode %in% names(get(varname[i])),i, 
+data4_complete$cluster)}
+data4_complete$cluster = ifelse(data4_complete$cluster==0, NA,data4_complete$cluster)
+table(data4_complete$cluster)
+
+data4_complete2 = data4_complete[-which(is.na(data4_complete$cluster)),] 
+#dim(data4_complete2) 762, 26
+#check the matching:
+#data4_complete2$bcr_patient_barcode == names(affiliationList)
+# sum(table(data4_complete2$cluster)) 
+data4_complete2 %>%
+group_by(cluster) %>%
+summarise(n())
+# A tibble: 6 x 2
+# cluster `n()`
+# <dbl> <int>
+#1 1101
+#2 2138
+#3 3102
+#4 4164
+#5 5127
+#6 6130
+# summarize age by cluster 
+agesummary<-data4_complete2 %>%
+group_by(cluster) %>%
+summarize( mean_age=round(mean(age,na.rm = TRUE),2),
+min_age= min(age,na.rm = TRUE), 
+max_age= max(age,na.rm = TRUE),
+sd_age = round(sd(age,na.rm = TRUE),2))
+agesummary <- as.matrix(agesummary)
+#library(gmodels)
+# summarize gender by cluster 
+table<-table(data4_complete2$cluster,data4_complete2$gender,exclude=NULL) 
+tablem<-as.matrix(table)
+proptablem<-as.matrix(round(prop.table(tablem,1),2))
+comtable<- array(NA, dim = dim(tablem),dimnames=list( rownames(tablem),
+colnames(tablem)))
+
+for(i in 1: dim(tablem)[1])
+{ for(j in 1: dim(tablem)[2]) {
+comtable[i,j] = noquote(paste(as.character(tablem[i,j]),
+" ","(",as.character(proptablem[i,j]*100),"%",")",
+collapse="",sep=""))
+}}
+print.noquote(comtable)
+#summarize tumor_stage by cluster 
+table<-table(data4_complete2$cluster,data4_complete2$tumor_stage,exclude=NULL)
+tablem2<-as.matrix(table)
+proptablem2<-as.matrix(round(prop.table(tablem2,1),2))
+comtable2<- array(NA, dim = dim(tablem2),dimnames=list( rownames(tablem2),colnames(tablem2)))
+for(i in 1: dim(tablem2)[1]) {
+for(j in 1: dim(tablem2)[2]) {
+comtable2[i,j] = noquote(paste(as.character(tablem2[i,j]),
+" ","(",as.character(proptablem2[i,j]*100),"%",")", collapse="",sep=""))
+}}
+###########################
+#summarize (clinical) subtype by cluster 
+table<-table(data4_complete2$cluster,data4_complete2$subtype,exclude=NULL)
+tablem3<-as.matrix(table)
+proptablem3<-as.matrix(round(prop.table(tablem3,1),2))
+comtable3<- array(NA, dim = dim(tablem3),dimnames=list( rownames(tablem3),
+colnames(tablem3)))
+
+for(i in 1: dim(tablem3)[1]) {
+for(j in 1: dim(tablem3)[2]) {
+comtable3[i,j] = noquote(paste(as.character(tablem3[i,j]),
+" ","(",as.character(proptablem3[i,j]*100),"%",")",
+collapse="",sep=""))
+}}
+print= print.noquote(cbind(agesummary,comtable,comtable2,comtable3) ) 
+print.noquote(t(print))
+# implement one way anova test based on the 6 subtypes t
+# using the result of F statistic to either accept or reject
+# the null hypothesis : all means of age between the different subtypes are the same
+
+modelanova <- aov(age~cluster, data = data4_complete2) 
+summary(modelanova)
+# table of subtypes and tumor stages & chi-square test
+table_ts =table(data4_complete2$tumor_stage, data4_complete2$cluster)
+chisq.test(table_ts)
+# table of subtypes and clinical subtypes & chi-square test
+table_cs = table(data4_complete2$subtype, data4_complete2$cluster) 
+chisq.test(table_cs)
+###################
+# heatmap of the subtypes identified by tensor CNMF based on the factorized matrix X 
+#setwd("~/Desktop/practicum (final reports)")
+library(CancerSubtypes)
+png("heatmap.png")
+p_value1 = survAnalysis(mainTitle = "heatmap",
+data4_complete2$OS.time,data4_complete2$OS,
+result2.test$group,
+result2.test$distanceMatrix) 
+dev.off()
+#Statistical significance of the identified subtypes based on Tensor CNMF
+sigclust1 = sigclustTest(tt,result2.test$group,nsim=1000,nrep=1,icovest=1)
+############################################################################ 
+# Comparison of the results of the Tensor CNMF with other baseline models’ results
+#To compare the results identified based on our Tensor CNMF
+#we also implemented SNF and SNF.CC
+
+#based on integrating (~C), (~G) and (~M) as the two baselines of integration methods. 
+#Furthermore, we also showed the results from the CNMF based
+# on the 3 individual genomic datasets (~C), (~G) and (~M) respectively. 
+library(NMF)
+#Now implement ExecuteCNMF based on the individual datasets
+#data11select (copy number variation),
+#data22select (gene expression data)
+# and data33select (methylation data )
+myCNMF = function (datasets, clusterNum, nrun = 30) 
+{if (is.list(datasets)) {
+temp = NULL
+for (i in 1:length(datasets)) {
+temp = rbind(temp, datasets[[i]]) 
+}}
+else temp = datasets
+data1 = rbind(pmax(temp, 0), -pmin(temp, 0))
+index = which(rowSums(data1) == 0)
+data1 = data1[-index, ]
+res = nmf(data1, rank = clusterNum, nrun = nrun,method="pe-nmf",######
+alpha=2,beta=2 #####
+# pe-nmf as methods in nmf for regularization
+# pass methods from NMF to the function myCNMF
+)
+
+distanceMatrix = slot(res, "consensus")
+attr(distanceMatrix, "class") = "Similarity"
+group = as.numeric(as.vector(predict(res)))
+result = list(group = group, distanceMatrix = distanceMatrix,
+originalResult = res)
+}
+d = data11select
+d2 = data22select
+d3 = data33select
+set.seed(700)
+resultsD_6 = myCNMF(data = t(data11select),clusterNum= 6, nrun =50 )
+set.seed(700)
+resultsD2_6 = myCNMF(data = t(data22select),clusterNum= 6, nrun =50 ) 
+set.seed(700)
+resultsD3_6 = myCNMF(data = t(data33select),clusterNum= 6, nrun =50 )
+#We also implemented SNF and SNF.CC
+#based on integrating (~C), (~G) and (~M) as the two baselines of integration methods.
+# transposing data11select , data22select and data33select is important
+listing= list(d1=t(data11select), d2 = t(data22select), d3 = t(data33select))
+set.seed(100)
+resultSNF = ExecuteSNF(listing,clusterNum= 6 )
+table(resultSNF$group)
+set.seed(100)
+
+resultSNF_CC = ExecuteSNF.CC(listing, clusterNum=6) 
+table(resultSNF_CC$group) 
+######################################## 
+#survival plots
+#d = data11select #copy number variation data 
+#d2 = data22select # gene expression data
+#d3 = data33select # methylation data
+#resultsD_6#copy number variation data
+#resultsD2_6 # gene expression data
+#resultsD3_6# methylation data
+result_700 =resultsD3_6
+# change resultsD3_6 to resultsD_6 , resultsD2_6 , resultSNF, resultSNF_CC , result2.test 
+# for the survival plots of subtypes of copy number variation data , gene expression data ,
+# subtypes identified by SNF, subtypes identified by SNF.CC ,
+# or subtypes identified by tensor CNMF based on the factorized matrix X 
+affiliationList = result_700$group
+names(affiliationList) = row.names(data11select)
+aff<- as.character(sprintf("affiliationList_s_%d", 1:6))
+varname <- paste(aff,sep="")
+for(i in 1:6){
+assign((varname[i]), affiliationList[ which(affiliationList==i)]) 
+}
+#####################################################
+
+
+
+# I will try to censor the time to event such that survivals >=10 years will be censored
+# I will generate the survival plots based on only 10-year survival data.
+# event indicator = 1 ==> event of death ; =0 ==> censored / survival 
+#####################################################
+#number of days for 10 years: 365.25 * 10 = 3652.5
+# data4_censored
+data4_censored = data4_complete #length(data4_censored$OS.time) # 1085
+data4_censored$OS=
+ifelse (data4_censored$OS.time>=3652.5, 0, data4_censored$OS) 
+data4_censored$DSS=
+ifelse (data4_censored$DSS.time>=3652.5, 0, data4_censored$DSS) # similarly for DSS 
+# 1 stands for the event of death, 0: censored/ survival
+#setwd("~/Desktop/practicum (final reports)")
+# OS survival
+png("M_OS.png")
+clusterfit<- survfit(Surv(OS.time, OS) ~ cluster, data = data4_censored) 
+#data = data4_complete
+ggsurvplot(clusterfit,#title = "OS survival ",
+font.title = c(16, "bold", "darkblue"), 
+font.x = c(14, "italic", "darkred"),
+font.y = c(14, "italic", "darkred"),
+font.tickslab = c(12, "plain", "darkgreen"),
+legend = "top", legend.title = "Clusters",
+pval = TRUE,size=0.4,xlim = c(0, 3652.5), 
+break.time.by = 365.25,xscale=365.25,
+risk.table = TRUE
+)+
+xlab("follow-up years")
+dev.off()
+# DSS survival
+png("M_DSS.png")
+#conduct survival analysis with clustering
+clusterfit<- survfit(Surv(DSS.time, DSS) ~ cluster, data = data4_censored)
+#data = data4_complete
+ggsurvplot(clusterfit,#title = "DSS survival ",
+font.title = c(16, "bold", "darkblue"), 
+font.x = c(14, "italic", "darkred"),
+font.y = c(14, "italic", "darkred"), 
+font.tickslab = c(12, "plain", "darkgreen"),
+legend = "top", legend.title = "Clusters", 
+pval = TRUE,size=0.4,xlim = c(0, 3652.5), break.time.by = 365.25,xscale=365.25, 
+risk.table = TRUE
+)+
+xlab("follow-up years")
+dev.off()
